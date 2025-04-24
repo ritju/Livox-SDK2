@@ -178,7 +178,7 @@ bool ParseCfgFile::ParseLidarCfg(const rapidjson::Value &object, const uint8_t& 
       return false;
     }
   } else if (object.HasMember("host_net_info") && object["host_net_info"].IsObject()) {
-    if (!ParseOldLidarCfg(object, device_type, lidars_cfg_ptr)) {
+    if (!ParseOldLidarCfg(object, device_type, lidars_cfg_ptr, custom_lidars_cfg_ptr)) {
       LOG_ERROR("Parse hap lidar old cfg failed.");
       return false;
     }
@@ -228,13 +228,26 @@ bool ParseCfgFile::ParseNewLidarCfg(const rapidjson::Value &object, const uint8_
   return true;
 }
 
-bool ParseCfgFile::ParseOldLidarCfg(const rapidjson::Value &object, const uint8_t& device_type, std::shared_ptr<std::vector<LivoxLidarCfg>>& lidars_cfg_ptr) {
+bool ParseCfgFile::ParseOldLidarCfg(const rapidjson::Value &object, const uint8_t& device_type, std::shared_ptr<std::vector<LivoxLidarCfg>>& lidars_cfg_ptr, std::shared_ptr<std::vector<LivoxLidarCfg>>& custom_lidars_cfg_ptr) {
   const rapidjson::Value &host_net_info_object = object["host_net_info"];
+  const char* lidarIp = getenv("LIVOX_DRIVER_LIDAR_IP");
   LivoxLidarCfg lidar_cfg;
+  if (lidarIp) {
+    std::cout << "LIVOX_DRIVER_LIDAR_IP: " << lidarIp <<std::endl;
+    lidar_cfg.lidar_net_info.lidar_ipaddr = lidarIp;
+  }
+
   if (!ParseTypeLidarCfg(object, host_net_info_object, device_type, lidar_cfg)) {
     return false;
   }
-  lidars_cfg_ptr->push_back(std::move(lidar_cfg));
+  
+  if (lidarIp) {
+    custom_lidars_cfg_ptr->push_back(std::move(lidar_cfg));
+  }
+  else {
+    lidars_cfg_ptr->push_back(std::move(lidar_cfg));
+  }
+  
   return true;
 }
 
@@ -297,7 +310,8 @@ bool ParseCfgFile::ParseLidarNetInfo(const rapidjson::Value &object, LivoxLidarN
 
 
 bool ParseCfgFile::ParseHostNetInfo(const rapidjson::Value &host_net_info_object, HostNetInfo& host_net_info) {
-  if (!host_net_info_object.HasMember("host_ip") && !host_net_info_object.HasMember("cmd_data_ip")) {
+  const char* hostIp = getenv("LIVOX_DRIVER_HOST_IP");
+  if (!hostIp && !host_net_info_object.HasMember("host_ip") && !host_net_info_object.HasMember("cmd_data_ip")) {
     LOG_ERROR("Parse host net info failed, has not host_ip or cmd_data_ip.");
     return false;
   }
@@ -318,6 +332,11 @@ bool ParseCfgFile::ParseHostNetInfo(const rapidjson::Value &host_net_info_object
   // parse host ip info
   if (host_net_info_object.HasMember("host_ip") && host_net_info_object["host_ip"].IsString()) {
     host_net_info.host_ip = host_net_info_object["host_ip"].GetString();
+  }
+
+  if (hostIp) {
+    std::cout << "LIVOX_DRIVER_HOST_IP: " << hostIp <<std::endl;
+    host_net_info.host_ip = hostIp;
   }
 
   // parse multicast ip info
